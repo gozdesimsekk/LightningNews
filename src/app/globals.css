@@ -40,3 +40,27 @@ a {
     color-scheme: dark;
   }
 }
+
+.chart-and-topics {
+  display: flex;
+  justify-content: space-between; /* Adjust spacing */
+  margin-top: 20px; /* Add some spacing from the top */
+}
+
+.top-topics {
+  width: 30%; 
+  margin-left: 20px;
+}
+
+.top-topics h2 {
+  margin-bottom: 10px;
+}
+
+.top-topics ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.top-topics li {
+  margin-bottom: 5px;
+}
