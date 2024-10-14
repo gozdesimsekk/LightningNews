@@ -8,6 +8,7 @@ import { FacebookFilled, TwitterOutlined } from '@ant-design/icons';
 import Image from 'next/image';
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { requestPermission, onMessageListener, sendPushNotification } from './utils/firebase';
 
 
 const { Option } = Select;
@@ -30,47 +31,116 @@ const News = () => {
   const indexOfLastArticle = currentPage * articlesPerPage;
   const indexOfFirstArticle = indexOfLastArticle - articlesPerPage;
   const currentArticles = news.slice(indexOfFirstArticle, indexOfLastArticle);
+  const previousNewsRef = useRef([]);
+  
+  const [notification, setNotification] = useState(null);
 
+  const [isFirstRender, setIsFirstRender] = useState(true);
+
+  useEffect(() => {
+    const initializePushNotifications = async () => {
+      try {
+        await requestPermission();
+        if ("serviceWorker" in navigator) {
+          navigator.serviceWorker
+            .register("/firebase-messaging-sw.js")
+            .then(function (registration) {
+              console.log("Service Worker Registered:", registration);
+            })
+            .catch(function (error) {
+              console.error("Service Worker Registration Failed:", error);
+            });
+        } else {
+          console.warn("Service Worker is not supported in this browser.");
+        }
+      } catch (error) {
+        console.error("Error during push notification initialization:", error);
+      }
+    };
+
+    initializePushNotifications();
+  }, []);
+
+  useEffect(() => {
+    const getNotification = async () => {
+      try {
+        const payload = await onMessageListener();
+        console.log('Payload:', payload);
+        toast.info("Yeni haberlere göz at", {
+          autoClose: false,      
+          hideProgressBar: true,  
+          closeOnClick: true,    
+          pauseOnHover: true,    
+          draggable: true,        
+          progress: undefined,   
+        });
+        setNotification({
+          title: payload.notification.title,
+          body: payload.notification.body,
+        });
+      } catch (error) {
+        console.error('message listener error:', error);
+      }
+    };
+
+    getNotification();
+  }, []);
+  
 
   const fetchNews = async () => {
     try {
       const sourcesQuery = selectedSources.length > 0 ? `&sources=${selectedSources.join(',')}` : '';
       const response = await axios.get(`https://newsapi.org/v2/everything?q=${query}&language=${language}&sortBy=${sortBy}${sourcesQuery}&apiKey=${process.env.NEXT_PUBLIC_NEWS_API_KEY}`);
-
+  
+      const isValidContent = (article) => {
+        return !(article.content === "[Removed]" || article.content === "" || article.description === "[Removed]" || article.description === "");
+      };
+  
       const articlesMap = {};
       response.data.articles.forEach(article => {
-        if (!(article.content === "[Removed]" || article.content === "" || article.description === "[Removed]" || article.description === "")) {
+        if (isValidContent(article)) {
           const contentKey = article.content;
-
+  
           if (!articlesMap[contentKey]) {
             articlesMap[contentKey] = article;
           } else {
             const existingArticleDate = new Date(articlesMap[contentKey].publishedAt);
             const newArticleDate = new Date(article.publishedAt);
-
-            if (newArticleDate < existingArticleDate) {
+  
+            if (newArticleDate > existingArticleDate) {
               articlesMap[contentKey] = article;
             }
           }
         }
       });
-
+  
       const filteredArticles = Object.values(articlesMap);
-
-
-
-      setNews(filteredArticles);
-
+  
+      //Control of the number of new news
+      const newNewsCount = Math.abs(filteredArticles.length - previousNewsRef.current.length);
+      
+      if (isFirstRender) {
+        setIsFirstRender(false); 
+      } else {
+        const newNewsCount = Math.abs(filteredArticles.length - previousNewsRef.current.length);
+        //push notif
+        if (newNewsCount > 0) {
+          sendPushNotification("Yeni Haberler", `${newNewsCount} yeni haber mevcut.`);
+        }
+      }
+  
       if (filteredArticles.length === 0) {
         toast.error("No news found.");
       }
 
+      previousNewsRef.current = filteredArticles;
+      setNews(filteredArticles); 
 
       const activeHours = {};
       filteredArticles.forEach(article => {
         const date = new Date(article.publishedAt);
         const hourKey = `${date.getHours()}:00`;
-
+  
         if (activeHours[hourKey]) {
           activeHours[hourKey].count++;
           activeHours[hourKey].sources.add(article.source.name);
@@ -78,14 +148,17 @@ const News = () => {
           activeHours[hourKey] = { count: 1, sources: new Set([article.source.name]) };
         }
       });
-
-      const hourData = Object.keys(activeHours).map(hour => ({
-        hour,
-        count: activeHours[hour].count,
-        sources: Array.from(activeHours[hour].sources)
-      })).sort((a, b) => parseInt(a.hour.split(':')[0], 10) - parseInt(b.hour.split(':')[0], 10));
-
-      setNewsData(hourData);
+  
+      const hourData = Object.keys(activeHours)
+        .map(hour => ({
+          hour,
+          count: activeHours[hour].count,
+          sources: Array.from(activeHours[hour].sources)
+        }))
+        .sort((a, b) => parseInt(a.hour.split(':')[0], 10) - parseInt(b.hour.split(':')[0], 10));
+  
+      setNewsData(hourData); 
+  
     } catch (error) {
       if (error.response && error.response.status === 429) {
         toast.error("Limit reached. Please try again later.", { autoClose: 5000 });
@@ -95,10 +168,16 @@ const News = () => {
       }
     }
   };
-
+  
   useEffect(() => {
     fetchNews();
+    const intervalId = setInterval(() => {
+      fetchNews();
+    },  1800000); // 30 min 
+    return () => clearInterval(intervalId);
   }, [query, language, selectedSources, sortBy]);
+  
+  
 
   useEffect(() => {
     const fetchSources = async () => {
@@ -210,8 +289,6 @@ const News = () => {
           ))}
         </Select>
       </div>
-
-
       <div className="charts-and-headlines">
         <div className="chart-container modern-chart">
           {news.length > 0 && <NewsChart data={newsData} />}
