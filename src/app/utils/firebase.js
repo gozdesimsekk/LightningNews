@@ -17,7 +17,7 @@ const messaging = getMessaging(app);
 export const requestPermission = async () => {
   try {
     const token = await getToken(messaging, {
-      vapidKey: 'BLQEpDEpzPMUFcsIXraRXYLq2Hwap8mKn3wW3BSmHENuaF8DzBV92Nn_NMc_Il8oKxmXztVSuz3IiuxQWt--sUM'
+      vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
     });
     if (token) {
       await saveTokenToServer(token);
