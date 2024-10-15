@@ -2,14 +2,18 @@
   "name": "flalingo_news",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
+ "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "static": "NEXT_PUBLIC_IS_MOBILE=true next build"
   },
   "dependencies": {
     "@ant-design/icons": "^5.5.1",
+    "@capacitor/cli": "^6.1.2",
+    "@capacitor/core": "^6.1.2",
+    "@capacitor/ios": "^6.1.2",
     "@firebase/messaging": "^0.12.12",
     "antd": "^5.21.3",
     "axios": "^1.7.7",
@@ -18,10 +22,10 @@
     "d3": "^7.9.0",
     "firebase": "^10.14.1",
     "firebase-admin": "^12.6.0",
-    "next": "14.2.15",
-    "react": "^18",
+    "next": "^14.2.15",
+    "react": "^18.3.1",
     "react-chartjs-2": "^5.2.0",
-    "react-dom": "^18",
+    "react-dom": "^18.3.1",
     "react-toastify": "^10.0.5"
   },
   "devDependencies": {
